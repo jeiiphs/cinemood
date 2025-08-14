@@ -1,0 +1,69 @@
+<ng-container *ngIf="!error; else errorTemplate">
+  <div class="movie-detail" *ngIf="!loading && movie">
+    <div class="header" [style.backgroundImage]="'url(https://image.tmdb.org/t/p/original' + movie.backdrop_path + ')'">
+      <div class="overlay">
+        <div class="content">
+          <h1>{{movie.title}}</h1>
+          <p class="tagline">{{movie.tagline}}</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="main-content">
+      <section class="synopsis">
+        <h2>Sinopsis</h2>
+        <p>{{movie.overview}}</p>
+      </section>
+
+      <section class="trailer" *ngIf="trailer">
+        <h2>Trailer</h2>
+        <iframe
+          [src]="'https://www.youtube.com/embed/' + trailer | safe"
+          frameborder="0"
+          allowfullscreen>
+        </iframe>
+      </section>
+
+      <section class="cast">
+        <h2>Reparto Principal</h2>
+        <div class="cast-grid">
+          <div class="cast-card" *ngFor="let actor of credits.cast.slice(0, 6)">
+            <img [src]="'https://image.tmdb.org/t/p/w185' + actor.profile_path" 
+                 [alt]="actor.name"
+                 *ngIf="actor.profile_path">
+            <h3>{{actor.name}}</h3>
+            <p>{{actor.character}}</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="watch-providers" *ngIf="providers">
+        <h2>Dónde Ver</h2>
+        <div class="providers-grid">
+          <div class="provider-type" *ngIf="providers.flatrate">
+            <h3>Streaming</h3>
+            <div class="provider-list">
+              <img *ngFor="let provider of providers.flatrate"
+                   [src]="'https://image.tmdb.org/t/p/original' + provider.logo_path"
+                   [alt]="provider.provider_name"
+                   [title]="provider.provider_name">
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <div class="loading" *ngIf="loading">
+    <div class="spinner"></div>
+    <p>Cargando información de la película...</p>
+  </div>
+</ng-container>
+
+<ng-template #errorTemplate>
+  <div class="error-container">
+    <h2>¡Ups! Algo salió mal</h2>
+    <p>No pudimos cargar la información de la película.</p>
+    <button (click)="router.navigate(['/'])">Volver al inicio</button>
+  </div>
+</ng-template>

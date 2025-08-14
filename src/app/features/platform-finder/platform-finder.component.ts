@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormControl } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -8,9 +8,9 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { debounceTime, distinctUntilChanged, switchMap, startWith } from 'rxjs/operators';
+import { debounceTime, distinctUntilChanged, switchMap, startWith, tap, map } from 'rxjs/operators';
 import { Observable, of } from 'rxjs';
-import { Movie, WatchProviderData } from '../../models/movie.interface';
+import { Movie, WatchProviderData, WatchProvider } from '../../models/movie.interface';
 import { TMDBService } from '../../services/tmdb.service';
 
 @Component({
@@ -47,31 +47,35 @@ import { TMDBService } from '../../services/tmdb.service';
               matInput
               [formControl]="searchControl"
               placeholder="ej. Los Vengadores, Breaking Bad..."
+              (focus)="onSearchFocus()"
             />
             <mat-icon matSuffix>search</mat-icon>
           </mat-form-field>
 
-          <div class="search-results" *ngIf="searchResults$ | async as results">
-            <div 
-              *ngFor="let movie of results" 
-              class="search-result-item"
-              (click)="selectMovie(movie)"
-            >
-              <img 
-                [src]="getImageUrl(movie.poster_path)" 
-                [alt]="movie.title"
-                class="result-poster"
-              />
-              <div class="result-info">
-                <h3>{{ movie.title }}</h3>
-                <p>{{ formatDate(movie.release_date) }}</p>
-                <div class="rating" *ngIf="movie.vote_average > 0">
-                  <mat-icon>star</mat-icon>
-                  <span>{{ movie.vote_average | number:'1.1-1' }}</span>
+          <!-- FIX: separo (async) as results de las condiciones -->
+          <ng-container *ngIf="(searchResults$ | async) as results">
+            <div class="search-results" *ngIf="showSearchResults && (results?.length ?? 0) > 0">
+              <div 
+                *ngFor="let movie of results; trackBy: trackByMovieId" 
+                class="search-result-item"
+                (click)="selectMovie(movie)"
+              >
+                <img 
+                  [src]="getImageUrl(movie.poster_path)" 
+                  [alt]="movie.title"
+                  class="result-poster"
+                />
+                <div class="result-info">
+                  <h3>{{ movie.title }}</h3>
+                  <p>{{ formatDate(movie.release_date) }}</p>
+                  <div class="rating" *ngIf="movie.vote_average > 0">
+                    <mat-icon>star</mat-icon>
+                    <span>{{ movie.vote_average | number:'1.1-1' }}</span>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          </ng-container>
         </div>
 
         <div class="selected-movie" *ngIf="selectedMovie">
@@ -513,11 +517,18 @@ import { TMDBService } from '../../services/tmdb.service';
   `]
 })
 export class PlatformFinderComponent implements OnInit {
-  searchControl = new FormControl('');
+  // No-nullable y tipado
+  searchControl = new FormControl<string>('', { nonNullable: true });
   searchResults$!: Observable<Movie[]>;
   selectedMovie: Movie | null = null;
-  watchProviders: any = null;
+  watchProviders: {
+    link: string;
+    flatrate?: WatchProvider[];
+    rent?: WatchProvider[];
+    buy?: WatchProvider[];
+  } | null = null;
   loadingProviders = false;
+  showSearchResults = false;
 
   constructor(private tmdbService: TMDBService) {}
 
@@ -530,21 +541,40 @@ export class PlatformFinderComponent implements OnInit {
       startWith(''),
       debounceTime(300),
       distinctUntilChanged(),
-      switchMap(query => {
-        if (!query || query.length < 2) {
-          return of([]);
-        }
-        return this.tmdbService.searchMovies(query).pipe(
-          switchMap(response => of(response.results.slice(0, 5)))
-        );
-      })
+      tap(term => {
+        const hasText = term.trim().length >= 2;
+        this.showSearchResults = hasText;
+        if (hasText) this.selectedMovie = null; // permite nuevas búsquedas sin refrescar
+      }),
+      switchMap(term => {
+        const q = term.trim();
+        return q.length >= 2
+          ? this.tmdbService.searchMovies(q)
+          : of({ results: [] as Movie[] });
+      }),
+      map(res => res.results.slice(0, 5))
     );
   }
 
   selectMovie(movie: Movie): void {
     this.selectedMovie = movie;
-    this.searchControl.setValue(movie.title);
-    this.loadWatchProviders(movie.id);
+    this.showSearchResults = false;
+    this.loadWatchProviders(movie.id); // cargar proveedores al seleccionar
+  }
+
+  trackByMovieId(_: number, m: Movie) { return m.id; }
+
+  @HostListener('document:click', ['$event'])
+  onClickOutside(event: Event): void {
+    if (!(event.target as HTMLElement).closest('.search-section')) {
+      this.showSearchResults = false;
+    }
+  }
+
+  onSearchFocus(): void {
+    const hasText = this.searchControl.value.trim().length >= 2;
+    this.showSearchResults = hasText;
+    if (hasText) this.selectedMovie = null;
   }
 
   private loadWatchProviders(movieId: number): void {
@@ -553,7 +583,7 @@ export class PlatformFinderComponent implements OnInit {
 
     this.tmdbService.getWatchProviders(movieId).subscribe({
       next: (data) => {
-        // Para propósitos de demostración, usar proveedores de España
+        // Para propósitos de demostración, usar proveedores de España (o US si no hay ES)
         this.watchProviders = data.results?.['ES'] || data.results?.['US'] || null;
         this.loadingProviders = false;
       },
@@ -564,15 +594,15 @@ export class PlatformFinderComponent implements OnInit {
     });
   }
 
-  getImageUrl(posterPath: string): string {
-    return this.tmdbService.getImageUrl(posterPath);
+  getImageUrl(posterPath: string | null): string {
+    return posterPath ? this.tmdbService.getImageUrl(posterPath) : '';
   }
 
   getProviderLogo(logoPath: string): string {
     return this.tmdbService.getImageUrl(logoPath, 'w92');
   }
 
-  formatDate(dateString: string): string {
+  formatDate(dateString: string | null): string {
     if (!dateString) return 'Por anunciar';
     const date = new Date(dateString);
     return date.toLocaleDateString('es-ES', { 

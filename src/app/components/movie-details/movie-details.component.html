@@ -1,0 +1,58 @@
+<div class="movie-details" *ngIf="!loading && movie">
+  <div class="backdrop" [style.backgroundImage]="'url(https://image.tmdb.org/t/p/original' + movie.backdrop_path + ')'">
+    <div class="overlay">
+      <div class="movie-info">
+        <h1>{{movie.title}}</h1>
+        <div class="meta">
+          <span class="rating">★ {{movie.vote_average | number:'1.1-1'}}</span>
+          <span class="year">{{movie.release_date | date:'yyyy'}}</span>
+          <span class="runtime">{{movie.runtime}} min</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="content">
+    <div class="synopsis">
+      <h2>Sinopsis</h2>
+      <p>{{movie.overview}}</p>
+    </div>
+
+    <div class="cast" *ngIf="credits">
+      <h2>Reparto Principal</h2>
+      <div class="cast-grid">
+        <div class="actor" *ngFor="let actor of credits.cast.slice(0,6)">
+          <img [src]="'https://image.tmdb.org/t/p/w185' + actor.profile_path" 
+               [alt]="actor.name"
+               *ngIf="actor.profile_path">
+          <h3>{{actor.name}}</h3>
+          <p>{{actor.character}}</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="trailer" *ngIf="videos?.results[0]">
+      <h2>Trailer</h2>
+      <iframe 
+        [src]="'https://www.youtube.com/embed/' + videos.results[0].key | safe" 
+        frameborder="0" 
+        allowfullscreen>
+      </iframe>
+    </div>
+
+    <div class="similar" *ngIf="similarMovies?.results.length">
+      <h2>Películas Similares</h2>
+      <div class="similar-grid">
+        <div class="movie-card" *ngFor="let movie of similarMovies.results.slice(0,6)">
+          <img [src]="'https://image.tmdb.org/t/p/w185' + movie.poster_path" 
+               [alt]="movie.title">
+          <h3>{{movie.title}}</h3>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="loading" *ngIf="loading">
+  <p>Cargando...</p>
+</div>

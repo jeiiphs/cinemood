@@ -1,0 +1,30 @@
+<div class="proximos-container">
+  <div *ngFor="let pelicula of peliculas" 
+       class="pelicula-card"
+       (click)="navigateToDetails(pelicula.id, $event)">
+    <div class="imagen-container">
+      <img [src]="'https://image.tmdb.org/t/p/w500' + pelicula.poster_path" 
+           [alt]="pelicula.title">
+      <button class="play-button" (click)="openTrailer(pelicula.id)">▶</button>
+    </div>
+    <h3 class="titulo-pelicula">{{pelicula.title}}</h3>
+  </div>
+
+  <div *ngIf="showModal" class="trailer-modal">
+    <div class="modal-content">
+      <button class="close-button" (click)="showModal = false">×</button>
+      <div class="trailer-container" *ngIf="trailerKey">
+        <iframe
+          width="100%"
+          height="100%"
+          [src]="'https://www.youtube.com/embed/' + trailerKey | safe"
+          frameborder="0"
+          allowfullscreen>
+        </iframe>
+      </div>
+      <div *ngIf="!trailerKey" class="no-trailer">
+        <p>No hay trailer disponible</p>
+      </div>
+    </div>
+  </div>
+</div>
